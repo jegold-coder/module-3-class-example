@@ -30,3 +30,16 @@ describe("search_docs", () => {
     expect(first.text.startsWith(target.title)).toBe(false);
   });
 });
+
+describe("Copper's instructions for document questions", () => {
+  it("require search_docs, a citation link on every sentence, and the not-found reply", async () => {
+    const { COPPER_INSTRUCTIONS: text } =
+      await import("@/lib/copper/assistant/instructions");
+    expect(text).toContain("search_docs");
+    expect(text).toMatch(/ONLY from the passages/);
+    expect(text).toMatch(/Every sentence .* citation/);
+    expect(text).toContain("[Copper Home User Guide, p. 9](/docs/");
+    expect(text).toContain("I couldn't find that in our support docs");
+    expect(text).toContain("Copper Crew");
+  });
+});

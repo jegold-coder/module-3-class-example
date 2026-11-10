@@ -383,7 +383,7 @@ function Answer({
             </div>
           )}
           <p className="text-sm whitespace-pre-wrap">
-            {reply}
+            <ReplyText text={reply} />
             {working && (
               <span className="bg-primary ml-0.5 inline-block h-4 w-0.5 animate-pulse align-middle" />
             )}
@@ -440,6 +440,29 @@ function InlineMarkdown({ text }: { text: string }) {
       );
     return part;
   });
+}
+
+/** The reply as text, with each [title, p. 9](/docs/file.pdf#page=9) citation as a link that opens that page. */
+function ReplyText({ text }: { text: string }) {
+  return text
+    .split(/(\[[^\]]+\]\(\/docs\/[a-z0-9-]+\.pdf#page=\d+\))/)
+    .map((part, i) => {
+      const link = part.match(
+        /^\[([^\]]+)\]\((\/docs\/[a-z0-9-]+\.pdf#page=\d+)\)$/,
+      );
+      if (!link) return part;
+      return (
+        <a
+          key={i}
+          href={link[2]}
+          target="_blank"
+          rel="noreferrer"
+          className="text-primary underline underline-offset-2"
+        >
+          [{link[1]}]
+        </a>
+      );
+    });
 }
 
 function ToolCard({ step, number }: { step: ToolStep; number: number }) {
