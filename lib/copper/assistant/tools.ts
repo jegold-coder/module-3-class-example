@@ -10,7 +10,10 @@ import {
   type Plan,
   type ProductId,
 } from "@/lib/copper/catalog";
+import { callEmbed, isAiConfigured } from "@/lib/ai/call";
 import { readInventory } from "@/lib/copper/inventory";
+import { DOCUMENTS } from "@/lib/copper/documents";
+import { EMBEDDING_DIMENSIONS, PASSAGES } from "@/lib/copper/passages";
 
 export type ProductList = {
   products: {
@@ -177,6 +180,76 @@ export async function checkAvailability(
   };
 }
 
+export type SearchDocsInput = { query: string };
+
+export type DocResult = {
+  title: string;
+  page: number;
+  text: string;
+  /** Opens the PDF at that page. */
+  url: string;
+};
+
+export type DocSearch =
+  | { status: "ok"; results: DocResult[] }
+  | { status: "unavailable"; message: string };
+
+export const searchDocsInput = z.object({
+  query: z.string().min(1).max(500),
+}) satisfies z.ZodType<SearchDocsInput>;
+
+/** How many passages search_docs returns. */
+export const DOC_RESULTS = 5;
+
+function cosine(a: number[], b: number[]): number {
+  let dot = 0;
+  let na = 0;
+  let nb = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    na += a[i] * a[i];
+    nb += b[i] * b[i];
+  }
+  return dot / (Math.sqrt(na) * Math.sqrt(nb) || 1);
+}
+
+/** search_docs: the 5 passages from the customer PDFs closest in meaning to the question. */
+export async function searchDocs(input: SearchDocsInput): Promise<DocSearch> {
+  if (!isAiConfigured() || PASSAGES.length === 0) {
+    return {
+      status: "unavailable",
+      message: "The documents can't be searched right now.",
+    };
+  }
+  const [query] = await callEmbed(
+    { module: 3, feature: "search-docs" },
+    {
+      values: [input.query],
+      dimensions: EMBEDDING_DIMENSIONS,
+      taskType: "RETRIEVAL_QUERY",
+    },
+  );
+  const results = PASSAGES.map((p) => ({
+    p,
+    score: cosine(query, p.embedding),
+  }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, DOC_RESULTS)
+    .map(({ p }) => {
+      const file = DOCUMENTS.find((d) => d.id === p.documentId)!.file;
+      return {
+        title: p.title,
+        page: p.page,
+        // The passage starts with its title; the card shows the title apart.
+        text: p.text.startsWith(`${p.title}. `)
+          ? p.text.slice(p.title.length + 2)
+          : p.text,
+        url: `${file}#page=${p.page}`,
+      };
+    });
+  return { status: "ok", results };
+}
+
 export const copperTools = {
   get_products: tool({
     description:
@@ -200,5 +273,11 @@ export const copperTools = {
       "Checks today's stock for a Copper product, for every color or just one.",
     inputSchema: checkAvailabilityInput,
     execute: async (input) => checkAvailability(input),
+  }),
+  search_docs: tool({
+    description:
+      "Searches Copper's user guides, terms and Copper Plus FAQ for setup, troubleshooting, warranty and policy answers. Returns the 5 closest passages, each with its document title, page number and a link to that page.",
+    inputSchema: searchDocsInput,
+    execute: async (input) => searchDocs(input),
   }),
 };

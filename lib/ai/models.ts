@@ -20,10 +20,13 @@ export type ModelId = (typeof MODELS)[number]["id"];
  * The model used when a call doesn't name one. 2.5 Flash writes a summary of
  * its thinking for every question, which Ask Copper shows students.
  */
-export const DEFAULT_MODEL: ModelId = "google/gemini-2.5-flash";
+export const DEFAULT_MODEL: ModelId = "google/gemini-3-flash";
 
 /** AI_MODEL if it names an approved model, otherwise the default. */
 export function defaultModel(): ModelId {
   const id = process.env.AI_MODEL;
   return MODELS.find((m) => m.id === id)?.id ?? DEFAULT_MODEL;
 }
+
+/** The model that turns text into embeddings for searching documents. */
+export const EMBEDDING_MODEL = "gemini-embedding-001";
