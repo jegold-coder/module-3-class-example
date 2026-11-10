@@ -116,7 +116,12 @@ export async function askCopper({
       }
       progress.status = "done";
       if (!progress.reply.trim()) progress.reply = SORRY;
-    } catch {
+    } catch (error) {
+      // The shopper sees a friendly message; the real cause goes to the log.
+      console.error(
+        "[ask-copper] failed:",
+        error instanceof Error ? error.message : String(error),
+      );
       progress.status = "error";
       if (!progress.reply.trim()) progress.reply = SORRY;
     }
